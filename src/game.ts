@@ -1,15 +1,15 @@
-import { Application, Assets, Sprite } from 'pixi.js';
+import { Application, Assets, Sprite, Texture } from 'pixi.js';
 import huli from '../res/huli1.png';
+import { Player } from './player';
+import type { GameState, PlayerData } from './shared/playerData';
 
-function getRandomInt(max: number) {
-    return Math.floor(Math.random() * max);
-  }
-  
-let s;
 
-function WebSocketTest() {
-    let socket = new WebSocket("wss://hypsnowfrog.dev/ws/test"+getRandomInt(2000));
+function CreateWebSocketClient(playerUUID: string): WebSocket {
+    let socket = new WebSocket("wss://hypsnowfrog.dev/ws/" + playerUUID);
+    return socket;
+}
 
+/*
     socket.onopen = function (e) {
         socket.send("My name is John");
     };
@@ -29,68 +29,51 @@ function WebSocketTest() {
     socket.onerror = function (error) {
         alert(`[error]`);
     };
+*/
+
+    /*
+    huliSprite.x = app.screen.width / 2;
+    huliSprite.y = app.screen.height / 2;
+    */
+
+function addPlayer(playerData: PlayerData, playerTexture: Texture, application: Application, playerMap: PlayerMap, uuid: string) {
+    const player = new Player(playerTexture, playerData);
+    application.stage.addChild(player.getSprite());
+    playerMap[uuid] = player;
 }
 
-
+export interface PlayerMap {
+    [uuid: string]: Player;
+}
 
 export async function game() {
 
-    WebSocketTest()
-
-    // Create a new application
     const app = new Application();
-
-    // Initialize the application
     await app.init({ background: '#1099bb', resizeTo: window });
-
-    // Append the application canvas to the document body
     document.body.appendChild(app.canvas);
 
-    // Load the bunny texture
-    const texture = await Assets.load(huli);
+    const playerMap: PlayerMap= {};
+    const playerUUID = crypto.randomUUID()
+    const ws = CreateWebSocketClient(playerUUID);
 
-    // Create a bunny Sprite
-    const huliSprite = new Sprite(texture);
+    const playerTexture = await Assets.load(huli);
+    addPlayer({
+        position: { x: 0, y: 0 },
+        speed: { x: 0, y: 0 },
+      }, playerTexture, app, playerMap, playerUUID)
 
-    // Center the sprite's anchor point
-    huliSprite.anchor.set(0.5);
+    const mainPlayer = playerMap[playerUUID];
 
-    // Move the sprite to the center of the screen
-    huliSprite.x = app.screen.width / 2;
-    huliSprite.y = app.screen.height / 2;
-
-    app.stage.addChild(huliSprite);
-
-    let targetX: number = app.screen.width / 2;
-    let targetY: number = app.screen.height / 2;
 
     document.addEventListener("pointermove", function (e) {
-        targetX = e.clientX;
-        targetY = e.clientY;
+        mainPlayer.setSpeed(e.clientX, e.clientY);
     })
-    // Listen for animate update
-    let lastangle = 0;
+
     app.ticker.add((time) => {
-        // Calculate the direction to the target
-        let directionX = targetX - huliSprite.x;
-        let directionY = targetY - huliSprite.y;
-
-        // Calculate the angle for rotation
-        let angle = Math.atan2(directionY, directionX);
-        if (Math.abs(angle - lastangle) < 0.4) {
-            huliSprite.rotation = angle;
+        for (const [key, value] of Object.entries(playerMap)) {
+            value.update(time.deltaTime);
         }
-        lastangle = angle;
 
-
-        // Calculate the distance to move each frame
-        let distance = 8; // Adjust this value to control speed
-        let distanceX = Math.cos(angle) * distance;
-        let distanceY = Math.sin(angle) * distance;
-
-        // Move the sprite
-        huliSprite.x += distanceX * time.deltaTime;
-        huliSprite.y += distanceY * time.deltaTime;
     });
 
 }
