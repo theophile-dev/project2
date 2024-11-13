@@ -1,9 +1,44 @@
-import { Application, Assets, AnimatedSprite, Texture } from 'pixi.js';
+import { Application, Assets, Sprite } from 'pixi.js';
+import huli from '../res/huli1.png';
+
+function getRandomInt(max: number) {
+    return Math.floor(Math.random() * max);
+  }
+  
+let s;
+
+function WebSocketTest() {
+    let socket = new WebSocket("wss://hypsnowfrog.dev/ws/test"+getRandomInt(2000));
+
+    socket.onopen = function (e) {
+        socket.send("My name is John");
+    };
+
+    socket.onmessage = function (event) {
+        alert(`[message] Data received from server: ${event.data}`);
+    };
+    socket.onclose = function (event) {
+        if (event.wasClean) {
+            alert(`[close] Connection closed cleanly, code=${event.code} reason=${event.reason}`);
+        } else {
+
+            alert('[close] Connection died');
+        }
+    };
+
+    socket.onerror = function (error) {
+        alert(`[error]`);
+    };
+}
+
+
 
 export async function game() {
-    const app = new Application();
 
-    const a = new Tilemap()
+    WebSocketTest()
+
+    // Create a new application
+    const app = new Application();
 
     // Initialize the application
     await app.init({ background: '#1099bb', resizeTo: window });
@@ -11,38 +46,51 @@ export async function game() {
     // Append the application canvas to the document body
     document.body.appendChild(app.canvas);
 
-    // Load the animation sprite sheet
-    await Assets.load('https://pixijs.com/assets/spritesheet/fighter.json');
+    // Load the bunny texture
+    const texture = await Assets.load(huli);
 
-    // Create an array of textures from the sprite sheet
-    const frames = [];
+    // Create a bunny Sprite
+    const huliSprite = new Sprite(texture);
 
-    for (let i = 0; i < 30; i++)
-    {
-        const val = i < 10 ? `0${i}` : i;
+    // Center the sprite's anchor point
+    huliSprite.anchor.set(0.5);
 
-        // Magically works since the spritesheet was loaded with the pixi loader
-        frames.push(Texture.from(`rollSequence00${val}.png`));
-    }
+    // Move the sprite to the center of the screen
+    huliSprite.x = app.screen.width / 2;
+    huliSprite.y = app.screen.height / 2;
 
-    // Create an AnimatedSprite (brings back memories from the days of Flash, right ?)
-    const anim = new AnimatedSprite(frames);
+    app.stage.addChild(huliSprite);
 
-    /*
-     * An AnimatedSprite inherits all the properties of a PIXI sprite
-     * so you can change its position, its anchor, mask it, etc
-     */
-    anim.x = app.screen.width / 2;
-    anim.y = app.screen.height / 2;
-    anim.anchor.set(0.5);
-    anim.animationSpeed = 4;
-    anim.play();
+    let targetX: number = app.screen.width / 2;
+    let targetY: number = app.screen.height / 2;
 
-    app.stage.addChild(anim);
+    document.addEventListener("pointermove", function (e) {
+        targetX = e.clientX;
+        targetY = e.clientY;
+    })
+    // Listen for animate update
+    let lastangle = 0;
+    app.ticker.add((time) => {
+        // Calculate the direction to the target
+        let directionX = targetX - huliSprite.x;
+        let directionY = targetY - huliSprite.y;
 
-    // Animate the rotation
-    app.ticker.add(() =>
-    {
-        anim.rotation += 0.01;
+        // Calculate the angle for rotation
+        let angle = Math.atan2(directionY, directionX);
+        if (Math.abs(angle - lastangle) < 0.4) {
+            huliSprite.rotation = angle;
+        }
+        lastangle = angle;
+
+
+        // Calculate the distance to move each frame
+        let distance = 8; // Adjust this value to control speed
+        let distanceX = Math.cos(angle) * distance;
+        let distanceY = Math.sin(angle) * distance;
+
+        // Move the sprite
+        huliSprite.x += distanceX * time.deltaTime;
+        huliSprite.y += distanceY * time.deltaTime;
     });
+
 }
